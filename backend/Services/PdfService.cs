@@ -1,7 +1,6 @@
 using System;
-using System.Collections.Generic;
-using System.IO;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Configuration;
 using PuppeteerSharp;
 
 namespace CertificateEngine.Services
@@ -13,8 +12,18 @@ namespace CertificateEngine.Services
 
     public class PdfService : IPdfService
     {
-        // Inline HTML renderer — loads Fabric.js from CDN and renders the JSON onto a canvas,
-        // then Puppeteer captures it as a PDF.
+        // Reads executable path from env var PUPPETEER_EXECUTABLE_PATH, then config,
+        // then falls back to a local Chromium download (dev only).
+        private readonly string? _executablePath;
+
+        public PdfService(IConfiguration config)
+        {
+            _executablePath =
+                Environment.GetEnvironmentVariable("PUPPETEER_EXECUTABLE_PATH")
+                ?? config["Puppeteer:ExecutablePath"];
+        }
+
+        // Inline HTML renderer: loads Fabric.js from CDN, renders JSON, signals done.
         private const string HtmlTemplate = @"<!DOCTYPE html>
 <html>
 <head>
@@ -42,45 +51,53 @@ namespace CertificateEngine.Services
 
         public async Task<byte[]> GeneratePdfAsync(string resolvedFabricJson)
         {
-            // Download Chromium on first run (cached afterward)
-            var fetcher = new BrowserFetcher();
-            await fetcher.DownloadAsync(BrowserFetcher.DefaultChromiumRevision);
-
-            await using var browser = await Puppeteer.LaunchAsync(new LaunchOptions
+            var launchOptions = new LaunchOptions
             {
                 Headless = true,
-                Args = new[] { "--no-sandbox", "--disable-setuid-sandbox" }
-            });
+                Args = new[]
+                {
+                    "--no-sandbox",
+                    "--disable-setuid-sandbox",
+                    "--disable-dev-shm-usage",   // required in containers with limited /dev/shm
+                    "--disable-gpu",
+                    "--single-process"            // reduces memory in Cloud Run single-CPU tier
+                }
+            };
 
+            // Use system Chromium in container; fall back to auto-download in local dev
+            if (!string.IsNullOrEmpty(_executablePath))
+            {
+                launchOptions.ExecutablePath = _executablePath;
+            }
+            else
+            {
+                var fetcher = new BrowserFetcher();
+                await fetcher.DownloadAsync(BrowserFetcher.DefaultChromiumRevision);
+            }
+
+            await using var browser = await Puppeteer.LaunchAsync(launchOptions);
             await using var page = await browser.NewPageAsync();
 
-            // Escape JSON for embedding in JS string context
-            var escapedJson = resolvedFabricJson
-                .Replace("\\", "\\\\")
-                .Replace("'", "\\'");
+            await page.SetViewportAsync(new ViewPortOptions { Width = 1000, Height = 700 });
 
             var html = string.Format(HtmlTemplate, resolvedFabricJson);
-
             await page.SetContentAsync(html, new NavigationOptions
             {
                 WaitUntil = new[] { WaitUntilNavigation.Load }
             });
 
-            // Wait for Fabric.js render to complete (poll flag set in JS)
-            await page.WaitForFunctionAsync("() => window.__RENDER_DONE__ === true",
-                new WaitForFunctionOptions { Timeout = 15000 });
+            // Poll until Fabric.js signals render complete
+            await page.WaitForFunctionAsync(
+                "() => window.__RENDER_DONE__ === true",
+                new WaitForFunctionOptions { Timeout = 20000 });
 
-            await page.SetViewportAsync(new ViewPortOptions { Width = 1000, Height = 700 });
-
-            var pdf = await page.PdfAsync(new PdfOptions
+            return await page.PdfAsync(new PdfOptions
             {
                 Width = "1000px",
                 Height = "700px",
                 PrintBackground = true,
                 MarginOptions = new MarginOptions { Top = "0", Bottom = "0", Left = "0", Right = "0" }
             });
-
-            return pdf;
         }
     }
 }

@@ -1,0 +1,146 @@
+# Google Cloud Build — Certificate Engine CI/CD
+#
+# Substitution variables (set in Cloud Build trigger or --substitutions flag):
+#   _PROJECT_ID   : GCP project ID              (default: $PROJECT_ID)
+#   _REGION       : Cloud Run region             (default: us-central1)
+#   _BACKEND_SVC  : backend Cloud Run service    (default: cert-engine-backend)
+#   _FRONTEND_SVC : frontend Cloud Run service   (default: cert-engine-frontend)
+#   _REPO         : Artifact Registry repo name  (default: cert-engine)
+
+substitutions:
+  _REGION: us-central1
+  _BACKEND_SVC: cert-engine-backend
+  _FRONTEND_SVC: cert-engine-frontend
+  _REPO: cert-engine
+
+steps:
+  # ── 1. Build backend image ─────────────────────────────────────────────────
+  - name: 'gcr.io/cloud-builders/docker'
+    id: build-backend
+    args:
+      - build
+      - -t
+      - '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/backend:$COMMIT_SHA'
+      - -t
+      - '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/backend:latest'
+      - ./backend
+    waitFor: ['-']
+
+  # ── 2. Build frontend image ────────────────────────────────────────────────
+  - name: 'gcr.io/cloud-builders/docker'
+    id: build-frontend
+    args:
+      - build
+      - -t
+      - '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/frontend:$COMMIT_SHA'
+      - -t
+      - '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/frontend:latest'
+      - ./frontend
+    waitFor: ['-']
+
+  # ── 3. Push backend image ──────────────────────────────────────────────────
+  - name: 'gcr.io/cloud-builders/docker'
+    id: push-backend
+    args:
+      - push
+      - '--all-tags'
+      - '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/backend'
+    waitFor: ['build-backend']
+
+  # ── 4. Push frontend image ─────────────────────────────────────────────────
+  - name: 'gcr.io/cloud-builders/docker'
+    id: push-frontend
+    args:
+      - push
+      - '--all-tags'
+      - '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/frontend'
+    waitFor: ['build-frontend']
+
+  # ── 5. Deploy backend to Cloud Run ────────────────────────────────────────
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    id: deploy-backend
+    entrypoint: gcloud
+    args:
+      - run
+      - deploy
+      - '${_BACKEND_SVC}'
+      - --image=${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/backend:$COMMIT_SHA
+      - --region=${_REGION}
+      - --platform=managed
+      - --allow-unauthenticated
+      - --port=8080
+      - --memory=2Gi
+      - --cpu=2
+      - --timeout=120s
+      - --concurrency=10
+      - --min-instances=0
+      - --max-instances=5
+      - --set-env-vars=ASPNETCORE_ENVIRONMENT=Production
+    waitFor: ['push-backend']
+
+  # ── 6. Get backend URL ─────────────────────────────────────────────────────
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    id: get-backend-url
+    entrypoint: bash
+    args:
+      - -c
+      - |
+        BACKEND_URL=$(gcloud run services describe ${_BACKEND_SVC} \
+          --region=${_REGION} \
+          --format='value(status.url)')
+        echo "$$BACKEND_URL" > /workspace/backend_url.txt
+        echo "Backend URL: $$BACKEND_URL"
+    waitFor: ['deploy-backend']
+
+  # ── 7. Deploy frontend to Cloud Run (inject BACKEND_URL) ──────────────────
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    id: deploy-frontend
+    entrypoint: bash
+    args:
+      - -c
+      - |
+        BACKEND_URL=$(cat /workspace/backend_url.txt)
+        gcloud run deploy ${_FRONTEND_SVC} \
+          --image=${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/frontend:$COMMIT_SHA \
+          --region=${_REGION} \
+          --platform=managed \
+          --allow-unauthenticated \
+          --port=8080 \
+          --memory=256Mi \
+          --cpu=1 \
+          --timeout=30s \
+          --concurrency=80 \
+          --min-instances=0 \
+          --max-instances=10 \
+          --set-env-vars="BACKEND_URL=$$BACKEND_URL"
+    waitFor: ['push-frontend', 'get-backend-url']
+
+  # ── 8. Print deployed URLs ─────────────────────────────────────────────────
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    id: print-urls
+    entrypoint: bash
+    args:
+      - -c
+      - |
+        FRONTEND_URL=$(gcloud run services describe ${_FRONTEND_SVC} \
+          --region=${_REGION} --format='value(status.url)')
+        BACKEND_URL=$(cat /workspace/backend_url.txt)
+        echo ""
+        echo "==================================="
+        echo "  Certificate Engine deployed!"
+        echo "  Frontend : $$FRONTEND_URL"
+        echo "  Backend  : $$BACKEND_URL"
+        echo "==================================="
+    waitFor: ['deploy-frontend']
+
+images:
+  - '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/backend:$COMMIT_SHA'
+  - '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/backend:latest'
+  - '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/frontend:$COMMIT_SHA'
+  - '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/frontend:latest'
+
+options:
+  logging: CLOUD_LOGGING_ONLY
+  machineType: E2_HIGHCPU_8
+
+timeout: 1800s

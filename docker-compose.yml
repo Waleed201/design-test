@@ -1,0 +1,38 @@
+version: '3.8'
+
+# Local container smoke-test. Mirrors the Cloud Run environment.
+# Usage: docker-compose up --build
+#
+# Frontend → http://localhost:8080
+# Backend  → http://localhost:5000
+
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    ports:
+      - '5000:8080'
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      PUPPETEER_EXECUTABLE_PATH: /usr/bin/chromium
+      ASPNETCORE_URLS: http://+:8080
+    healthcheck:
+      test: ['CMD', 'curl', '-f', 'http://localhost:8080/api/template/latest']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - '8080:8080'
+    environment:
+      # Point nginx proxy to the backend container
+      BACKEND_URL: http://backend:8080
+    depends_on:
+      backend:
+        condition: service_healthy

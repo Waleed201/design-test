@@ -1,6 +1,7 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
+import { environment } from '../../environments/environment';
 
 export interface TemplateDto {
   id?: number;
@@ -11,7 +12,7 @@ export interface TemplateDto {
 
 @Injectable({ providedIn: 'root' })
 export class TemplateService {
-  private readonly baseUrl = '/api/template';
+  private readonly baseUrl = `${environment.apiBase}/template`;
 
   // In-memory fallback when backend is not reachable
   private localTemplate: TemplateDto | null = null;
@@ -31,7 +32,7 @@ export class TemplateService {
   }
 
   generatePdf(id: number, variables: Record<string, string>): Observable<Blob> {
-    return this.http.post(`/api/generate-pdf/${id}`, variables, { responseType: 'blob' });
+    return this.http.post(`${environment.apiBase}/generate-pdf/${id}`, variables, { responseType: 'blob' });
   }
 
   // Local storage helpers for PoC offline mode

@@ -21,7 +21,9 @@ namespace CertificateEngine
             services.AddCors(options =>
             {
                 options.AddDefaultPolicy(builder =>
-                    builder.WithOrigins("http://localhost:4200")
+                    // In production, requests arrive from the Nginx frontend container on the same
+                    // Cloud Run project, so we allow any origin (nginx enforces CORS externally).
+                    builder.AllowAnyOrigin()
                            .AllowAnyHeader()
                            .AllowAnyMethod());
             });
@@ -29,10 +31,11 @@ namespace CertificateEngine
             services.AddControllers()
                     .AddNewtonsoftJson();
 
-            // Register services as singletons so the in-memory store persists for the session
             services.AddSingleton<ITemplateStore, TemplateStore>();
             services.AddSingleton<IVariableService, VariableService>();
-            services.AddSingleton<IPdfService, PdfService>();
+            // PdfService needs IConfiguration to read Puppeteer:ExecutablePath
+            services.AddSingleton<IPdfService>(sp =>
+                new PdfService(sp.GetRequiredService<IConfiguration>()));
         }
 
         public void Configure(IApplicationBuilder app, IWebHostEnvironment env)
