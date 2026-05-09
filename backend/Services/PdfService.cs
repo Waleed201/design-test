@@ -92,7 +92,8 @@ namespace CertificateEngine.Services
                 "() => window.__RENDER_DONE__ === true",
                 new WaitForFunctionOptions { Timeout = 20000 });
 
-            return await page.PdfAsync(new PdfOptions
+            // PdfDataAsync returns bytes; PdfAsync(path) saves to a file — different overloads in v6+
+            return await page.PdfDataAsync(new PdfOptions
             {
                 Width = "1000px",
                 Height = "700px",
