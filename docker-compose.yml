@@ -1,5 +1,3 @@
-version: '3.8'
-
 # Local container smoke-test. Mirrors the Cloud Run environment.
 # Usage: docker-compose up --build
 #

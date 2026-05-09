@@ -29,7 +29,9 @@ namespace CertificateEngine
             });
 
             services.AddControllers()
-                    .AddNewtonsoftJson();
+                    .AddNewtonsoftJson(options =>
+                        options.SerializerSettings.NullValueHandling =
+                            Newtonsoft.Json.NullValueHandling.Ignore);
 
             services.AddSingleton<ITemplateStore, TemplateStore>();
             services.AddSingleton<IVariableService, VariableService>();

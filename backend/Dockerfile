@@ -1,5 +1,5 @@
 # ── Stage 1: build ───────────────────────────────────────────────────────────
-FROM mcr.microsoft.com/dotnet/core/sdk:3.1-buster AS builder
+FROM mcr.microsoft.com/dotnet/sdk:6.0-bullseye-slim AS builder
 
 WORKDIR /src
 
@@ -10,7 +10,7 @@ COPY . .
 RUN dotnet publish -c Release -o /app/publish
 
 # ── Stage 2: runtime ─────────────────────────────────────────────────────────
-FROM mcr.microsoft.com/dotnet/core/aspnet:3.1-buster-slim AS runtime
+FROM mcr.microsoft.com/dotnet/aspnet:6.0-bullseye-slim AS runtime
 
 # Install Chromium and its dependencies for PuppeteerSharp
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -41,10 +41,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     xdg-utils \
     && rm -rf /var/lib/apt/lists/*
 
-# Tell PuppeteerSharp to use the system Chromium; skip download
+# Tell PuppeteerSharp to use the system Chromium; skip its own downloader
 ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
 ENV PUPPETEER_SKIP_DOWNLOAD=true
-# Cloud Run injects PORT; default to 8080 (ASP.NET reads ASPNETCORE_URLS)
 ENV ASPNETCORE_URLS=http://+:8080
 
 WORKDIR /app
