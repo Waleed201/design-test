@@ -1,0 +1,153 @@
+<div class="stage-container">
+  <div class="container-fluid">
+
+    <div *ngIf="statusMessage" class="alert alert-{{statusType}} alert-dismissible mb-3 py-2" role="alert">
+      <small>{{ statusMessage }}</small>
+      <button type="button" class="close py-1" (click)="statusMessage=''"><span>&times;</span></button>
+    </div>
+
+    <div class="row">
+      <!-- Left Sidebar: Variable Form -->
+      <div class="col-md-3 pr-1">
+
+        <div class="tools-panel mb-3">
+          <h6><i class="fas fa-fill-drip mr-1"></i> Program Mode</h6>
+          <p class="text-muted" style="font-size:11px">
+            Fill in the values for each detected placeholder. Click <strong>Apply Variables</strong> to preview the result, then generate the final PDF.
+          </p>
+          <div *ngIf="!templateLoaded" class="alert alert-warning py-2 px-2 mb-0" style="font-size:11px">
+            <i class="fas fa-exclamation-triangle mr-1"></i>
+            No template. Complete Steps 1 &amp; 2 first.
+          </div>
+        </div>
+
+        <div class="tools-panel mb-3">
+          <h6>
+            <i class="fas fa-code mr-1"></i> Variables
+            <span class="badge badge-secondary ml-1">{{ variables.length }}</span>
+          </h6>
+
+          <div *ngIf="variables.length === 0" class="text-muted small mb-2">
+            No placeholders detected in template.
+          </div>
+
+          <div *ngFor="let v of variables; let i = index" class="mb-3">
+            <label class="small d-block mb-1">
+              <span class="placeholder-text">{{ v.placeholder }}</span>
+            </label>
+            <div class="input-group input-group-sm">
+              <input type="text"
+                     class="form-control"
+                     [(ngModel)]="v.value"
+                     [placeholder]="'Value for ' + v.placeholder">
+              <div class="input-group-append">
+                <button class="btn btn-outline-danger" type="button" (click)="removeVariable(i)" title="Remove">
+                  <i class="fas fa-times"></i>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Add custom variable -->
+          <hr class="my-2">
+          <label class="small d-block mb-1">Add custom variable:</label>
+          <div class="input-group input-group-sm">
+            <input type="text"
+                   class="form-control"
+                   [(ngModel)]="newVarKey"
+                   placeholder="e.g. trainee_name"
+                   (keyup.enter)="addCustomVariable()">
+            <div class="input-group-append">
+              <button class="btn btn-outline-primary" type="button" (click)="addCustomVariable()">
+                <i class="fas fa-plus"></i>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div class="tools-panel">
+          <h6><i class="fas fa-cogs mr-1"></i> Actions</h6>
+
+          <button class="btn btn-primary btn-block mb-2"
+                  (click)="applyVariables()"
+                  [disabled]="!templateLoaded">
+            <i class="fas fa-eye mr-1"></i> Apply Variables
+          </button>
+
+          <button class="btn btn-outline-secondary btn-block mb-2"
+                  (click)="resetPreview()"
+                  [disabled]="!isApplied">
+            <i class="fas fa-undo mr-1"></i> Reset Preview
+          </button>
+
+          <hr>
+
+          <button class="btn btn-export btn-block mb-2"
+                  (click)="generatePdf()"
+                  [disabled]="isGenerating || !isApplied">
+            <i class="fas fa-file-pdf mr-1"></i>
+            {{ isGenerating ? 'Generating...' : 'Generate PDF' }}
+          </button>
+
+          <p class="text-muted mb-2" style="font-size:10px">
+            With backend: downloads PDF. Without backend: exports high-res PNG.
+          </p>
+
+          <hr>
+          <button class="btn btn-outline-secondary btn-sm btn-block" (click)="goBack()">
+            <i class="fas fa-arrow-left mr-1"></i> Back to Authority
+          </button>
+        </div>
+
+      </div>
+
+      <!-- Canvas Preview -->
+      <div class="col-md-9 pl-1">
+        <div class="d-flex align-items-center mb-2">
+          <span class="badge badge-success status-badge mr-2">Program Mode</span>
+          <small class="text-muted mr-3">
+            <i class="fas fa-eye-slash mr-1"></i> Read-only canvas
+          </small>
+          <span *ngIf="isApplied" class="badge badge-info status-badge">
+            <i class="fas fa-check mr-1"></i> Variables Applied
+          </span>
+          <span *ngIf="!isApplied && templateLoaded" class="badge badge-warning status-badge">
+            Original Template
+          </span>
+        </div>
+        <div class="canvas-wrapper" style="min-height:720px">
+          <canvas #fabricCanvas></canvas>
+        </div>
+
+        <!-- Variable summary table -->
+        <div *ngIf="variables.length > 0" class="tools-panel mt-3">
+          <h6><i class="fas fa-table mr-1"></i> Variable Summary</h6>
+          <table class="table table-sm table-bordered var-table mb-0">
+            <thead class="thead-light">
+              <tr>
+                <th>Placeholder</th>
+                <th>Replacement Value</th>
+                <th style="width:80px">Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let v of variables">
+                <td><span class="placeholder-text">{{ v.placeholder }}</span></td>
+                <td>
+                  <input type="text"
+                         class="form-control form-control-sm"
+                         [(ngModel)]="v.value"
+                         [placeholder]="'Enter value...'">
+                </td>
+                <td class="text-center">
+                  <span *ngIf="v.value" class="badge badge-success">Ready</span>
+                  <span *ngIf="!v.value" class="badge badge-warning">Empty</span>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

@@ -1,0 +1,21 @@
+<div class="step-wizard">
+  <div class="container">
+    <div class="d-flex align-items-center justify-content-center">
+      <ng-container *ngFor="let step of steps; let i = index; let last = last">
+        <div class="step-item"
+             [class.active]="isActive(step.route)"
+             [class.completed]="isCompleted(i)"
+             (click)="navigate(step.route)">
+          <div class="step-circle">
+            <span *ngIf="!isCompleted(i)">{{ step.icon }}</span>
+            <i *ngIf="isCompleted(i)" class="fas fa-check" style="font-size:14px"></i>
+          </div>
+          <span class="step-label">{{ step.label }}</span>
+        </div>
+        <div *ngIf="!last" class="step-connector" [class.done]="isCompleted(i)"></div>
+      </ng-container>
+    </div>
+  </div>
+</div>
+
+<router-outlet></router-outlet>
