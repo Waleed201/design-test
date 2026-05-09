@@ -2,6 +2,7 @@ using System;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Configuration;
 using PuppeteerSharp;
+using PuppeteerSharp.Media;
 
 namespace CertificateEngine.Services
 {
