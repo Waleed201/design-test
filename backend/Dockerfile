@@ -14,7 +14,6 @@ FROM mcr.microsoft.com/dotnet/aspnet:6.0-bullseye-slim AS runtime
 
 # Install Chromium and its dependencies for PuppeteerSharp
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    curl \
     chromium \
     fonts-liberation \
     fonts-noto \
@@ -40,6 +39,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libxrandr2 \
     libxshmfence1 \
     xdg-utils \
+    && rm -rf /var/lib/apt/lists/*
+
+# curl lives in its own layer so it never invalidates the expensive Chromium
+# layer above. It is only used by the container health check.
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl \
     && rm -rf /var/lib/apt/lists/*
 
 # Tell PuppeteerSharp to use the system Chromium; skip its own downloader
