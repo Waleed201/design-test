@@ -14,6 +14,7 @@ FROM mcr.microsoft.com/dotnet/aspnet:6.0-bullseye-slim AS runtime
 
 # Install Chromium and its dependencies for PuppeteerSharp
 RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl \
     chromium \
     fonts-liberation \
     fonts-noto \
