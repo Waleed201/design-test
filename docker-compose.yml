@@ -16,7 +16,7 @@ services:
       PUPPETEER_EXECUTABLE_PATH: /usr/bin/chromium
       ASPNETCORE_URLS: http://+:8080
     healthcheck:
-      test: ['CMD', 'curl', '-f', 'http://localhost:8080/api/template/latest']
+      test: ['CMD', 'curl', '-f', 'http://localhost:8080/api/template']
       interval: 10s
       timeout: 5s
       retries: 5

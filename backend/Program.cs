@@ -15,7 +15,10 @@ namespace CertificateEngine
                 .ConfigureWebHostDefaults(webBuilder =>
                 {
                     webBuilder.UseStartup<Startup>();
-                    webBuilder.UseUrls("http://localhost:5000");
+                    // Bind address/port comes from the ASPNETCORE_URLS environment
+                    // variable (http://+:8080 in the container). Do not hard-code a
+                    // UseUrls() here — it would override that env var and bind to the
+                    // wrong port/interface.
                 });
     }
 }
